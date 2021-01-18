@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.0;
 
-/// @title Enum - Collection of enums
-/// @author Richard Meissner - <richard@gnosis.pm>
 contract Enum {
     enum Operation {
         Call,
@@ -10,8 +8,8 @@ contract Enum {
     }
 }
 
-interface GnosisSafe {
-    /// @dev Allows a Module to execute a Safe transaction without any further confirmations.
+interface Executor {
+    /// @dev Allows a Module to execute a transaction.
     /// @param to Destination address of module transaction.
     /// @param value Ether value of module transaction.
     /// @param data Data payload of module transaction.
@@ -22,6 +20,8 @@ interface GnosisSafe {
 }
 
 contract DelayedTxModule {
+
+    event NewAnnouncement(address indexed executor, address indexed announcer, bytes32 txHash);
     
     string public constant NAME = "Delayed Transaction Module";
     string public constant VERSION = "1.0.0";
@@ -41,16 +41,17 @@ contract DelayedTxModule {
     }
     
     struct Announcement {
-        address announcer; // (Optional) If set used to chec if announcer is still present on execution
+        address announcer; 
         uint64 execTime; // Block time in seconds when the announced transaction can be executed
+        bool requireAnnouncer; // Flag if to check if announcer is still present on execution
         bool executed; // Flag if the announced transaction was executed
     }
     
     // Executor -> Announcer -> Config
-    mapping (address => mapping (address => Config)) configs;
+    mapping (address => mapping (address => Config)) public configs;
     
     // Transaction Hash -> Announcement
-    mapping (bytes32 => Announcement) anouncements;
+    mapping (bytes32 => Announcement) public announcements;
     
     function updateConfig(address announcer, uint64 delay, bool requireAnnouncer)
         public
@@ -68,18 +69,19 @@ contract DelayedTxModule {
         // No need to check overflow because Solidity does this now (starting with 0.8.0)
         uint64 execTime = uint64(block.timestamp) + config.delay;
         bytes memory approveAnnouncement = abi.encodeWithSignature(
-            "approveTransactionAnnouncement(address,uint256,bytes,uint8,uint256,address,uint64)", 
+            "approveTransactionAnnouncement(address,uint256,bytes,uint8,uint256,address,uint64,bool)", 
             to, 
             value,
             data,
             operation,
             nonce,
-            config.requireAnnouncer ? msg.sender : address(0),
-            execTime
+            msg.sender,
+            execTime,
+            config.requireAnnouncer
         );
-        // We redirect the anouncement via the executor
+        // We redirect the announcement via the executor
         // This is a preemptive check that this modules is enabled and this also notifies the executor that a transaction was announced
-        require(GnosisSafe(executor).execTransactionFromModule(address(this), 0, approveAnnouncement, Enum.Operation.Call), "Could not announce transaction");
+        require(Executor(executor).execTransactionFromModule(address(this), 0, approveAnnouncement, Enum.Operation.Call), "Could not announce transaction");
     }
     
     function approveTransactionAnnouncement(
@@ -89,15 +91,17 @@ contract DelayedTxModule {
         Enum.Operation operation,
         uint256 nonce,
         address announcer,
-        uint64 execTime
+        uint64 execTime,
+        bool requireAnnouncer
     ) 
         public 
     {
         // Note: msg.sender is the executor
         bytes32 txHash = getTransactionHash(msg.sender, to, value, data, operation, nonce);
-        Announcement memory anouncement = anouncements[txHash];
-        require(!anouncement.executed && anouncement.execTime == 0, "Cannot announce same transaction again");
-        anouncements[txHash] = Announcement(announcer, execTime, false);
+        Announcement memory announcement = announcements[txHash];
+        require(!announcement.executed && announcement.execTime == 0, "Cannot announce same transaction again");
+        announcements[txHash] = Announcement(announcer, execTime, requireAnnouncer, false);
+        emit NewAnnouncement(msg.sender, announcer, txHash);
     }
     
     function revokeTransactionAnnouncement(address to, uint256 value, bytes memory data, Enum.Operation operation, uint256 nonce) 
@@ -105,7 +109,7 @@ contract DelayedTxModule {
     {
         // Note: msg.sender is the executor
         bytes32 txHash = getTransactionHash(msg.sender, to, value, data, operation, nonce);
-        delete anouncements[txHash];
+        delete announcements[txHash];
     }
     
     /// @notice Allows to trigger execution of a delayed transaction that has been announced before.
@@ -120,16 +124,17 @@ contract DelayedTxModule {
         public 
     {
         bytes32 txHash = getTransactionHash(executor, to, value, data, operation, nonce);
-        Announcement memory anouncement = anouncements[txHash];
-        require(anouncement.execTime <= block.timestamp, "Cannot execute transaction yet");
+        Announcement memory announcement = announcements[txHash];
+        require(announcement.execTime <= block.timestamp, "Cannot execute transaction yet");
         // If the announcer is set we should check if the announcer is still enabled
         require(
-            anouncement.announcer == address(0) || configs[executor][anouncement.announcer].delay > 0, 
+            !announcement.requireAnnouncer || configs[executor][announcement.announcer].delay > 0, 
             "Could not find valid config for executor and announcer"
         );
-        anouncement.executed = true;
-        anouncements[txHash] = anouncement;
-        GnosisSafe(executor).execTransactionFromModule(to, value, data, operation);
+        announcement.executed = true;
+        announcements[txHash] = announcement;
+        // We do not require a success here, so that the hash will always be marked as executed
+        Executor(executor).execTransactionFromModule(to, value, data, operation);
     }
     
     /// @dev Returns the chain id used by this contract.
