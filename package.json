@@ -1,0 +1,19 @@
+{
+    "name": "@rmeissner/delayed-tx-module",
+    "version": "1.0.0",
+    "description": "Delayed transaction module for the Gnosis Safe",
+    "scripts": {
+    },
+    "author": "msc.meissner@gmail.com",
+    "license": "MIT",
+    "devDependencies": {
+    },
+    "dependencies": {
+      "@gnosis.pm/singleton-deployer-truffle": "^1.1.0",
+      "dotenv": "^8.0.0",
+      "solc": "0.8.0"
+    },
+    "resolutions": {
+      "bitcore-lib": "8.1.1"
+    }
+  }
