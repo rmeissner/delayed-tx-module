@@ -22,6 +22,7 @@ interface Executor {
 contract DelayedTxModule {
 
     event NewAnnouncement(address indexed executor, address indexed announcer, bytes32 txHash);
+    event UpdatedConfig(address indexed executor, address indexed announcer, uint64 delay, bool requireAnnouncer);
     
     string public constant NAME = "Delayed Transaction Module";
     string public constant VERSION = "1.0.0";
@@ -58,6 +59,7 @@ contract DelayedTxModule {
     {
         // Note: msg.sender is the executor
         configs[msg.sender][announcer] = Config(delay, requireAnnouncer);
+        emit UpdatedConfig(msg.sender, announcer, delay, requireAnnouncer);
     }
     
     function announceTransaction(address executor, address to, uint256 value, bytes memory data, Enum.Operation operation, uint256 nonce) 
