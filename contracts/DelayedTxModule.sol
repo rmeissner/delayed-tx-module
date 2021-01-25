@@ -112,6 +112,9 @@ contract DelayedTxModule {
     {
         // Note: msg.sender is the executor
         bytes32 txHash = getTransactionHash(msg.sender, to, value, data, operation, nonce);
+        Announcement memory announcement = announcements[txHash];
+        require(announcement.execTime > 0, "Could not find announcement");
+        require(!announcement.executed, "Cannot revoke executed transaction");
         delete announcements[txHash];
     }
     
