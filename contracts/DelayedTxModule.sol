@@ -158,7 +158,7 @@ contract DelayedTxModule {
         Enum.Operation operation,
         uint256 nonce
     ) 
-        private 
+        public 
         view 
         returns (bytes memory) 
     {
