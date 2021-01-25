@@ -101,7 +101,8 @@ contract DelayedTxModule {
         // Note: msg.sender is the executor
         bytes32 txHash = getTransactionHash(msg.sender, to, value, data, operation, nonce);
         Announcement memory announcement = announcements[txHash];
-        require(!announcement.executed && announcement.execTime == 0, "Cannot announce same transaction again");
+        require(execTime > block.timestamp, "Cannot delay transaction into the present or past (only future)");
+        require(announcement.execTime == 0 && !announcement.executed, "Cannot announce same transaction again");
         announcements[txHash] = Announcement(announcer, execTime, requireAnnouncer, false);
         emit NewAnnouncement(msg.sender, announcer, txHash);
     }
@@ -127,6 +128,8 @@ contract DelayedTxModule {
     {
         bytes32 txHash = getTransactionHash(executor, to, value, data, operation, nonce);
         Announcement memory announcement = announcements[txHash];
+        require(announcement.execTime > 0, "Could not find announcement");
+        require(!announcement.executed, "Cannot execute transaction again");
         require(announcement.execTime <= block.timestamp, "Cannot execute transaction yet");
         // If the announcer is set we should check if the announcer is still enabled
         require(
