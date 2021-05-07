@@ -36,11 +36,11 @@ describe("DelayedTxModule", async () => {
         it("throws if module not enabled", async () => {
             const { executor } = await setupTest();
             const module = await getModule();
-            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, false]);
+            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, 1, false, true]);
             await executor.exec(module.address, 0, updateConfigData);
             await expect(
                 await module.configs(executor.address, announcer.address)
-            ).to.be.deep.equal([BigNumber.from(1), false]);
+            ).to.be.deep.equal([BigNumber.from(1), 1, false, true]);
             const to = user1.address;
             const value = 0;
             const data = "0x";
@@ -54,11 +54,11 @@ describe("DelayedTxModule", async () => {
         it("triggers event for not required announcer", async () => {
             const { executor } = await setupTest();
             const module = await getModule();
-            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, false]);
+            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, 1, false, true]);
             await executor.exec(module.address, 0, updateConfigData);
             await expect(
                 await module.configs(executor.address, announcer.address)
-            ).to.be.deep.equal([BigNumber.from(1), false]);
+            ).to.be.deep.equal([BigNumber.from(1), 1, false, true]);
             await executor.setModule(module.address);
             const to = user1.address;
             const value = 0;
@@ -73,17 +73,17 @@ describe("DelayedTxModule", async () => {
             const block = await ethers.provider.getBlock(announceTx!!.blockHash)
             await expect(
                 await module.announcements(txHash)
-            ).to.be.deep.equal([announcer.address, BigNumber.from(block.timestamp + 1), false, false])
+            ).to.be.deep.equal([announcer.address, BigNumber.from(block.timestamp + 1), 1, false, false])
         })
 
         it("triggers event for required announcer", async () => {
             const { executor } = await setupTest();
             const module = await getModule();
-            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, true]);
+            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, 1, true, true]);
             await executor.exec(module.address, 0, updateConfigData);
             await expect(
                 await module.configs(executor.address, announcer.address)
-            ).to.be.deep.equal([BigNumber.from(1), true]);
+            ).to.be.deep.equal([BigNumber.from(1), 1, true, true]);
             await executor.setModule(module.address);
             const to = user1.address;
             const value = 0;
@@ -98,17 +98,17 @@ describe("DelayedTxModule", async () => {
             const block = await ethers.provider.getBlock(announceTx!!.blockHash)
             await expect(
                 await module.announcements(txHash)
-            ).to.be.deep.equal([announcer.address, BigNumber.from(block.timestamp + 1), true, false])
+            ).to.be.deep.equal([announcer.address, BigNumber.from(block.timestamp + 1), 1, true, false])
         })
 
         it("throws if same announcement is made again", async () => {
             const { executor } = await setupTest();
             const module = await getModule();
-            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, true]);
+            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, 1, true, true]);
             await executor.exec(module.address, 0, updateConfigData);
             await expect(
                 await module.configs(executor.address, announcer.address)
-            ).to.be.deep.equal([BigNumber.from(1), true]);
+            ).to.be.deep.equal([BigNumber.from(1), 1, true, true]);
             await executor.setModule(module.address);
             const to = user1.address;
             const value = 0;
@@ -145,11 +145,11 @@ describe("DelayedTxModule", async () => {
         it("throws if executed twice", async () => {
             const { executor } = await setupTest();
             const module = await getModule();
-            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, true]);
+            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, 1, true, true]);
             await executor.exec(module.address, 0, updateConfigData);
             await expect(
                 await module.configs(executor.address, announcer.address)
-            ).to.be.deep.equal([BigNumber.from(1), true]);
+            ).to.be.deep.equal([BigNumber.from(1), 1, true, true]);
             await executor.setModule(module.address);
             const to = user1.address;
             const value = 0;
@@ -170,11 +170,11 @@ describe("DelayedTxModule", async () => {
         it("throws if not possible to execute yet", async () => {
             const { executor } = await setupTest();
             const module = await getModule();
-            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 4242424242, true]);
+            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 4242424242, 1, true, true]);
             await executor.exec(module.address, 0, updateConfigData);
             await expect(
                 await module.configs(executor.address, announcer.address)
-            ).to.be.deep.equal([BigNumber.from(4242424242), true]);
+            ).to.be.deep.equal([BigNumber.from(4242424242), 1, true, true]);
             await executor.setModule(module.address);
             const to = user1.address;
             const value = 0;
@@ -193,11 +193,11 @@ describe("DelayedTxModule", async () => {
         it("throws if required announcer not available anymore", async () => {
             const { executor } = await setupTest();
             const module = await getModule();
-            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, true]);
+            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, 1, true, true]);
             await executor.exec(module.address, 0, updateConfigData);
             await expect(
                 await module.configs(executor.address, announcer.address)
-            ).to.be.deep.equal([BigNumber.from(1), true]);
+            ).to.be.deep.equal([BigNumber.from(1), 1, true, true]);
             await executor.setModule(module.address);
             const to = user1.address;
             const value = 0;
@@ -209,11 +209,11 @@ describe("DelayedTxModule", async () => {
                 module.announceTransaction(executor.address, to, value, data, operation, nonce)
             ).to.emit(module, 'NewAnnouncement').withArgs(executor.address, announcer.address, txHash)
             
-            const resetConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 0, false]);
+            const resetConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 0, 1, false, true]);
             await executor.exec(module.address, 0, resetConfigData);
             await expect(
                 await module.configs(executor.address, announcer.address)
-            ).to.be.deep.equal([BigNumber.from(0), false]);
+            ).to.be.deep.equal([BigNumber.from(0), 1, false, true]);
 
             await expect(
                 module.executeTransaction(executor.address, to, value, data, operation, nonce)
@@ -223,11 +223,11 @@ describe("DelayedTxModule", async () => {
         it("does not throws if announcer not available anymore, but not required", async () => {
             const { executor } = await setupTest();
             const module = await getModule();
-            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, false]);
+            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, 1, false, true]);
             await executor.exec(module.address, 0, updateConfigData);
             await expect(
                 await module.configs(executor.address, announcer.address)
-            ).to.be.deep.equal([BigNumber.from(1), false]);
+            ).to.be.deep.equal([BigNumber.from(1), 1, false, true]);
             await executor.setModule(module.address);
             const to = user1.address;
             const value = 0;
@@ -239,11 +239,11 @@ describe("DelayedTxModule", async () => {
                 module.announceTransaction(executor.address, to, value, data, operation, nonce)
             ).to.emit(module, 'NewAnnouncement').withArgs(executor.address, announcer.address, txHash)
             
-            const resetConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 0, false]);
+            const resetConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 0, 1, false, true]);
             await executor.exec(module.address, 0, resetConfigData);
             await expect(
                 await module.configs(executor.address, announcer.address)
-            ).to.be.deep.equal([BigNumber.from(0), false]);
+            ).to.be.deep.equal([BigNumber.from(0), 1, false, true]);
 
             await module.executeTransaction(executor.address, to, value, data, operation, nonce)
         })
@@ -267,7 +267,7 @@ describe("DelayedTxModule", async () => {
         it("throws if already executed", async () => {
             const { executor } = await setupTest();
             const module = await getModule();
-            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, true]);
+            const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, 1, true, true]);
             await executor.exec(module.address, 0, updateConfigData);
             await executor.setModule(module.address);
             const to = user1.address;
