@@ -289,6 +289,7 @@ contract DelayedTxModule {
         );
         announcement.executed = true;
         announcements[txHash] = announcement;
+        require(gasleft() > gasLimit);
         uint256 txGas = gasLimit == 0 ? gasleft() : gasLimit;
         bool success =
             Executor(executor).execTransactionFromModule{gas: txGas}(

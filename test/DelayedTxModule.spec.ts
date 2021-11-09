@@ -240,6 +240,15 @@ describe("DelayedTxModule", async () => {
             ).to.be.deep.equal([BigNumber.from(0), 1, false, true]);
             await executeTx(module, executor, tx)
         })
+        
+        it.skip("enforces gas limit before execution", async () => {
+        })
+        
+        it.skip("does not revert if execution reverts with gas limit", async () => {
+        })
+        
+        it.skip("revert if execution reverts without gas limit", async () => {
+        })
     })
 
     describe("revoke announcement", async () => {
