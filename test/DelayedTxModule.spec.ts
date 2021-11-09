@@ -2,6 +2,16 @@ import { expect } from "chai";
 import { Contract, BigNumber } from "ethers";
 import hre, { deployments, ethers, waffle } from "hardhat";
 import "@nomiclabs/hardhat-ethers";
+import { Deployment } from "hardhat-deploy/types";
+
+interface DelayedTx { 
+    to: string, 
+    value: number, 
+    data: string, 
+    operation: number, 
+    nonce: number, 
+    gasLimit: number 
+}
 
 describe("DelayedTxModule", async () => {
 
@@ -19,17 +29,36 @@ describe("DelayedTxModule", async () => {
     })
     const [announcer, user1] = waffle.provider.getWallets();
 
+    const buildDelayedTx = (partialTx: { to: string, value?: number, data?: string, operation?: number, nonce?: number, gasLimit?: number }): DelayedTx => {
+        return {
+            to: partialTx.to,
+            value: partialTx.value || 0,
+            data: partialTx.data || "0x",
+            operation: partialTx.operation || 0,
+            nonce: partialTx.nonce || 0,
+            gasLimit:  partialTx.gasLimit || 0
+        }
+    }
+
+    const announceTx = (module: Contract, executor: Contract, tx: DelayedTx): Promise<any> => {
+        return module.announceTransaction(executor.address, tx.to, tx.value, tx.data, tx.operation, tx.nonce, tx.gasLimit)
+    }
+
+    const executeTx = (module: Contract, executor: Contract, tx: DelayedTx): Promise<any> => {
+        return module.executeTransaction(executor.address, tx.to, tx.value, tx.data, tx.operation, tx.nonce, tx.gasLimit)
+    }
+
+    const delayTxHash = (module: Contract, executor: Contract, tx: DelayedTx): Promise<any> => {
+        return module.getTransactionHash(executor.address, tx.to, tx.value, tx.data, tx.operation, tx.nonce, tx.gasLimit)
+    }
+
     describe("announce tx", async () => {
         it("throws if module not configured", async () => {
             const { executor } = await setupTest();
             const module = await getModule();
-            const to = user1.address;
-            const value = 0;
-            const data = "0x";
-            const operation = 0;
-            const nonce = 0;
+            const tx = buildDelayedTx({ to: user1.address });
             await expect(
-                module.announceTransaction(executor.address, to, value, data, operation, nonce)
+                announceTx(module, executor, tx)
             ).to.be.revertedWith("Could not find valid config for executor and announcer");
         })
 
@@ -41,13 +70,9 @@ describe("DelayedTxModule", async () => {
             await expect(
                 await module.configs(executor.address, announcer.address)
             ).to.be.deep.equal([BigNumber.from(1), 1, false, true]);
-            const to = user1.address;
-            const value = 0;
-            const data = "0x";
-            const operation = 0;
-            const nonce = 0;
+            const tx = buildDelayedTx({ to: user1.address });
             await expect(
-                module.announceTransaction(executor.address, to, value, data, operation, nonce)
+                announceTx(module, executor, tx)
             ).to.be.revertedWith("Not authorized");
         })
 
@@ -60,17 +85,13 @@ describe("DelayedTxModule", async () => {
                 await module.configs(executor.address, announcer.address)
             ).to.be.deep.equal([BigNumber.from(1), 1, false, true]);
             await executor.setModule(module.address);
-            const to = user1.address;
-            const value = 0;
-            const data = "0x";
-            const operation = 0;
-            const nonce = 0;
-            const txHash = await module.getTransactionHash(executor.address, to, value, data, operation, nonce)
-            let announceTx: any;
+            const tx = buildDelayedTx({ to: user1.address });
+            const txHash = await delayTxHash(module, executor, tx)
+            let trackedTx: any;
             await expect(
-                module.announceTransaction(executor.address, to, value, data, operation, nonce).then((tx: any) => announceTx = tx)
+                announceTx(module, executor, tx).then((tx: any) => trackedTx = tx)
             ).to.emit(module, 'NewAnnouncement').withArgs(executor.address, announcer.address, txHash)
-            const block = await ethers.provider.getBlock(announceTx!!.blockHash)
+            const block = await ethers.provider.getBlock(trackedTx!!.blockHash)
             await expect(
                 await module.announcements(txHash)
             ).to.be.deep.equal([announcer.address, BigNumber.from(block.timestamp + 1), 1, false, false])
@@ -85,17 +106,13 @@ describe("DelayedTxModule", async () => {
                 await module.configs(executor.address, announcer.address)
             ).to.be.deep.equal([BigNumber.from(1), 1, true, true]);
             await executor.setModule(module.address);
-            const to = user1.address;
-            const value = 0;
-            const data = "0x";
-            const operation = 0;
-            const nonce = 0;
-            const txHash = await module.getTransactionHash(executor.address, to, value, data, operation, nonce)
-            let announceTx: any;
+            const tx = buildDelayedTx({ to: user1.address });
+            const txHash = await delayTxHash(module, executor, tx)
+            let trackedTx: any;
             await expect(
-                module.announceTransaction(executor.address, to, value, data, operation, nonce).then((tx: any) => announceTx = tx)
+                announceTx(module, executor, tx).then((tx: any) => trackedTx = tx)
             ).to.emit(module, 'NewAnnouncement').withArgs(executor.address, announcer.address, txHash)
-            const block = await ethers.provider.getBlock(announceTx!!.blockHash)
+            const block = await ethers.provider.getBlock(trackedTx!!.blockHash)
             await expect(
                 await module.announcements(txHash)
             ).to.be.deep.equal([announcer.address, BigNumber.from(block.timestamp + 1), 1, true, false])
@@ -110,18 +127,15 @@ describe("DelayedTxModule", async () => {
                 await module.configs(executor.address, announcer.address)
             ).to.be.deep.equal([BigNumber.from(1), 1, true, true]);
             await executor.setModule(module.address);
-            const to = user1.address;
-            const value = 0;
-            const data = "0x";
-            const operation = 0;
-            const nonce = 0;
-            const txHash = await module.getTransactionHash(executor.address, to, value, data, operation, nonce)
+            const tx = buildDelayedTx({ to: user1.address });
+            const txHash = await delayTxHash(module, executor, tx)
             await expect(
-                module.announceTransaction(executor.address, to, value, data, operation, nonce)
+                announceTx(module, executor, tx)
             ).to.emit(module, 'NewAnnouncement').withArgs(executor.address, announcer.address, txHash)
+            await module.announcements(txHash)
 
             await expect(
-                module.announceTransaction(executor.address, to, value, data, operation, nonce)
+                announceTx(module, executor, tx)
             ).to.revertedWith("Could not announce transaction")
         })
     })
@@ -131,13 +145,9 @@ describe("DelayedTxModule", async () => {
             const { executor } = await setupTest();
             const module = await getModule();
             await executor.setModule(module.address);
-            const to = user1.address;
-            const value = 0;
-            const data = "0x";
-            const operation = 0;
-            const nonce = 0;
+            const tx = buildDelayedTx({ to: user1.address });
             await expect(
-                module.executeTransaction(executor.address, to, value, data, operation, nonce)
+                executeTx(module, executor, tx)
             ).to.be.revertedWith("Could not find announcement");
         })
         
@@ -151,19 +161,15 @@ describe("DelayedTxModule", async () => {
                 await module.configs(executor.address, announcer.address)
             ).to.be.deep.equal([BigNumber.from(1), 1, true, true]);
             await executor.setModule(module.address);
-            const to = user1.address;
-            const value = 0;
-            const data = "0x";
-            const operation = 0;
-            const nonce = 0;
-            const txHash = await module.getTransactionHash(executor.address, to, value, data, operation, nonce)
+            const tx = buildDelayedTx({ to: user1.address });
+            const txHash = await delayTxHash(module, executor, tx)
             await expect(
-                module.announceTransaction(executor.address, to, value, data, operation, nonce)
+                announceTx(module, executor, tx)
             ).to.emit(module, 'NewAnnouncement').withArgs(executor.address, announcer.address, txHash)
-            await module.executeTransaction(executor.address, to, value, data, operation, nonce)
+            await executeTx(module, executor, tx)
 
             await expect(
-                module.executeTransaction(executor.address, to, value, data, operation, nonce)
+                executeTx(module, executor, tx)
             ).to.revertedWith("Cannot execute transaction again")
         })
         
@@ -176,17 +182,13 @@ describe("DelayedTxModule", async () => {
                 await module.configs(executor.address, announcer.address)
             ).to.be.deep.equal([BigNumber.from(4242424242), 1, true, true]);
             await executor.setModule(module.address);
-            const to = user1.address;
-            const value = 0;
-            const data = "0x";
-            const operation = 0;
-            const nonce = 0;
-            const txHash = await module.getTransactionHash(executor.address, to, value, data, operation, nonce)
+            const tx = buildDelayedTx({ to: user1.address });
+            const txHash = await delayTxHash(module, executor, tx)
             await expect(
-                module.announceTransaction(executor.address, to, value, data, operation, nonce)
+                announceTx(module, executor, tx)
             ).to.emit(module, 'NewAnnouncement').withArgs(executor.address, announcer.address, txHash)
             await expect(
-                module.executeTransaction(executor.address, to, value, data, operation, nonce)
+                executeTx(module, executor, tx)
             ).to.revertedWith("Cannot execute transaction yet")
         })
         
@@ -199,14 +201,10 @@ describe("DelayedTxModule", async () => {
                 await module.configs(executor.address, announcer.address)
             ).to.be.deep.equal([BigNumber.from(1), 1, true, true]);
             await executor.setModule(module.address);
-            const to = user1.address;
-            const value = 0;
-            const data = "0x";
-            const operation = 0;
-            const nonce = 0;
-            const txHash = await module.getTransactionHash(executor.address, to, value, data, operation, nonce)
+            const tx = buildDelayedTx({ to: user1.address });
+            const txHash = await delayTxHash(module, executor, tx)
             await expect(
-                module.announceTransaction(executor.address, to, value, data, operation, nonce)
+                announceTx(module, executor, tx)
             ).to.emit(module, 'NewAnnouncement').withArgs(executor.address, announcer.address, txHash)
             
             const resetConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 0, 1, false, true]);
@@ -216,7 +214,7 @@ describe("DelayedTxModule", async () => {
             ).to.be.deep.equal([BigNumber.from(0), 1, false, true]);
 
             await expect(
-                module.executeTransaction(executor.address, to, value, data, operation, nonce)
+                executeTx(module, executor, tx)
             ).to.revertedWith("Could not find valid config for executor and announcer")
         })
         
@@ -229,14 +227,10 @@ describe("DelayedTxModule", async () => {
                 await module.configs(executor.address, announcer.address)
             ).to.be.deep.equal([BigNumber.from(1), 1, false, true]);
             await executor.setModule(module.address);
-            const to = user1.address;
-            const value = 0;
-            const data = "0x";
-            const operation = 0;
-            const nonce = 0;
-            const txHash = await module.getTransactionHash(executor.address, to, value, data, operation, nonce)
+            const tx = buildDelayedTx({ to: user1.address });
+            const txHash = await delayTxHash(module, executor, tx)
             await expect(
-                module.announceTransaction(executor.address, to, value, data, operation, nonce)
+                announceTx(module, executor, tx)
             ).to.emit(module, 'NewAnnouncement').withArgs(executor.address, announcer.address, txHash)
             
             const resetConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 0, 1, false, true]);
@@ -244,8 +238,7 @@ describe("DelayedTxModule", async () => {
             await expect(
                 await module.configs(executor.address, announcer.address)
             ).to.be.deep.equal([BigNumber.from(0), 1, false, true]);
-
-            await module.executeTransaction(executor.address, to, value, data, operation, nonce)
+            await executeTx(module, executor, tx)
         })
     })
 
@@ -253,14 +246,9 @@ describe("DelayedTxModule", async () => {
         it("throws if not announced", async () => {
             await setupTest();
             const module = await getModule();
-            const to = user1.address;
-            const value = 0;
-            const data = "0x";
-            const operation = 0;
-            const nonce = 0;
-
+            const tx = buildDelayedTx({ to: user1.address });
             await expect(
-                module.revokeTransactionAnnouncement(to, value, data, operation, nonce)
+                module.revokeTransactionAnnouncement(tx.to, tx.value, tx.data, tx.operation, tx.nonce, tx.gasLimit)
             ).to.be.revertedWith("Could not find announcement");
         })
 
@@ -270,15 +258,11 @@ describe("DelayedTxModule", async () => {
             const updateConfigData = module.interface.encodeFunctionData("updateConfig", [announcer.address, 1, 1, true, true]);
             await executor.exec(module.address, 0, updateConfigData);
             await executor.setModule(module.address);
-            const to = user1.address;
-            const value = 0;
-            const data = "0x";
-            const operation = 0;
-            const nonce = 0;
-            await module.announceTransaction(executor.address, to, value, data, operation, nonce)
-            await module.executeTransaction(executor.address, to, value, data, operation, nonce)
+            const tx = buildDelayedTx({ to: user1.address });
+            await announceTx(module, executor, tx)
+            await executeTx(module, executor, tx)
 
-            const revokeAnnouncement = module.interface.encodeFunctionData("revokeTransactionAnnouncement", [to, value, data, operation, nonce]);
+            const revokeAnnouncement = module.interface.encodeFunctionData("revokeTransactionAnnouncement", [tx.to, tx.value, tx.data, tx.operation, tx.nonce, tx.gasLimit]);
             await expect(
                 executor.exec(module.address, 0, revokeAnnouncement)
             ).to.be.revertedWith("Cannot revoke executed transaction");

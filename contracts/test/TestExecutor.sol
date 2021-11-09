@@ -19,14 +19,14 @@ contract TestExecutor {
         }
     }
 
-    function execTransactionFromModule(address payable to, uint256 value, bytes calldata data, uint8 operation)
-        external
-        returns (bool success)
-    {
+    function execTransactionFromModule(
+        address payable to,
+        uint256 value,
+        bytes calldata data,
+        uint8 operation
+    ) external returns (bool success) {
         require(msg.sender == module, "Not authorized");
-        if (operation == 1)
-            (success,) = to.delegatecall(data);
-        else
-            (success,) = to.call{value: value}(data);
+        if (operation == 1) (success, ) = to.delegatecall(data);
+        else (success, ) = to.call{value: value}(data);
     }
 }
