@@ -9,7 +9,6 @@
     "build": "hardhat compile",
     "test": "hardhat test",
     "deploy": "hardhat deploy",
-    "release": "./scripts/deploy.sh",
     "lint": "yarn lint:sol && yarn lint:ts",
     "lint:sol": "solhint 'contracts/**/*.sol'",
     "lint:ts": "eslint --max-warnings 0 .",
